@@ -1,0 +1,16 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    { "Sid": "Discover", "Effect": "Allow",
+      "Action": ["redshift-serverless:ListWorkgroups", "redshift-serverless:GetWorkgroup"],
+      "Resource": "*" },
+    { "Sid": "RunSqlOnOneWorkgroup", "Effect": "Allow",
+      "Action": ["redshift-serverless:GetCredentials", "redshift-data:ExecuteStatement",
+                 "redshift-data:BatchExecuteStatement"],
+      "Resource": "arn:aws:redshift-serverless:us-east-1:111122223333:workgroup/<agent-workgroup-id>" },
+    { "Sid": "ReadOwnStatements", "Effect": "Allow",
+      "Action": ["redshift-data:DescribeStatement", "redshift-data:GetStatementResult"],
+      "Resource": "*",
+      "Condition": { "StringEquals": { "redshift-data:statement-owner-iam-userid": "${aws:userid}" } } }
+  ]
+}

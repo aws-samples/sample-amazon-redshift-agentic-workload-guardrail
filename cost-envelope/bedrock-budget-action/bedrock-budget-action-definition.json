@@ -1,0 +1,6 @@
+{
+  "IamActionDefinition": {
+    "PolicyArn": "arn:aws:iam::<account-id>:policy/<deny-policy-name>",
+    "Roles": ["<model-role-name>"]
+  }
+}

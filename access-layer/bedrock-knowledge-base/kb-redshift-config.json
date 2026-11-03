@@ -1,0 +1,22 @@
+{
+  "queryEngineConfiguration": {
+    "type": "SERVERLESS",
+    "serverlessConfiguration": {
+      "workgroupArn": "arn:aws:redshift-serverless:us-east-1:111122223333:workgroup/<workgroup-id>",
+      "authConfiguration": { "type": "IAM" }
+    }
+  },
+  "storageConfigurations": [
+    { "type": "REDSHIFT", "redshiftConfiguration": { "databaseName": "sales_dw" } }
+  ],
+  "queryGenerationConfiguration": {
+    "executionTimeoutSeconds": 60,
+    "generationContext": {
+      "tables": [
+        { "name": "sales_dw.sales.orders", "description": "One row per order", "inclusion": "INCLUDE" },
+        { "name": "sales_dw.sales.customers", "inclusion": "INCLUDE",
+          "columns": [ { "name": "email", "inclusion": "EXCLUDE" } ] }
+      ]
+    }
+  }
+}
