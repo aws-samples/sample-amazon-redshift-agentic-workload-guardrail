@@ -1,0 +1,23 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    { "Sid": "RedshiftDataAPIStatementPermissions", "Effect": "Allow",
+      "Action": ["redshift-data:GetStatementResult", "redshift-data:DescribeStatement",
+                 "redshift-data:CancelStatement"],
+      "Resource": "*",
+      "Condition": { "StringEquals": { "redshift-data:statement-owner-iam-userid": "${aws:userid}" } } },
+    { "Sid": "RedshiftDataAPIExecutePermissions", "Effect": "Allow",
+      "Action": "redshift-data:ExecuteStatement",
+      "Resource": "arn:aws:redshift-serverless:us-east-1:111122223333:workgroup/<workgroup-id>" },
+    { "Sid": "RedshiftServerlessGetCredentials", "Effect": "Allow",
+      "Action": "redshift-serverless:GetCredentials",
+      "Resource": "arn:aws:redshift-serverless:us-east-1:111122223333:workgroup/<workgroup-id>" },
+    { "Sid": "SqlWorkbenchAccess", "Effect": "Allow",
+      "Action": ["sqlworkbench:GetSqlRecommendations", "sqlworkbench:PutSqlGenerationContext",
+                 "sqlworkbench:GetSqlGenerationContext", "sqlworkbench:DeleteSqlGenerationContext"],
+      "Resource": "*" },
+    { "Sid": "GenerateQueryAccess", "Effect": "Allow",
+      "Action": "bedrock:GenerateQuery",
+      "Resource": "*" }
+  ]
+}

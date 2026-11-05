@@ -1,0 +1,12 @@
+{
+  "BudgetName": "<agent-id>-bedrock-monthly",
+  "BudgetType": "COST",
+  "TimeUnit": "MONTHLY",
+  "BudgetLimit": { "Amount": "<monthly-usd>", "Unit": "USD" },
+  "FilterExpression": {
+    "And": [
+      { "Dimensions": { "Key": "SERVICE", "Values": ["Amazon Bedrock"], "MatchOptions": ["EQUALS"] } },
+      { "Tags": { "Key": "iamPrincipal/agent-id", "Values": ["<agent-id>"], "MatchOptions": ["EQUALS"] } }
+    ]
+  }
+}

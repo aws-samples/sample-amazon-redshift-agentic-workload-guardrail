@@ -1,0 +1,10 @@
+{
+  "Sid": "AgentsQueryOnlyAgentWorkgroups",
+  "Effect": "Deny",
+  "Action": ["redshift-data:ExecuteStatement", "redshift-data:BatchExecuteStatement"],
+  "Resource": "*",
+  "Condition": {
+    "Bool": { "aws:ViaAWSMCPService": "true" },
+    "StringNotEquals": { "aws:ResourceTag/agent-access": "true" }
+  }
+}

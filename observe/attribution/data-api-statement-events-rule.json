@@ -1,0 +1,4 @@
+{
+  "source": ["aws.redshift-data"],
+  "detail-type": ["Redshift Data Statement Status Change"]
+}

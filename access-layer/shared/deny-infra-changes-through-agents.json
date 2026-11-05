@@ -1,0 +1,14 @@
+{
+  "Sid": "NoRedshiftInfrastructureChangesThroughAgents",
+  "Effect": "Deny",
+  "Action": ["redshift:CreateCluster", "redshift:DeleteCluster", "redshift:ModifyCluster*",
+             "redshift:ResizeCluster", "redshift:PauseCluster",
+             "redshift:ResumeCluster", "redshift:RebootCluster",
+             "redshift:RestoreFromClusterSnapshot", "redshift:CreateTags",
+             "redshift:DeleteTags", "redshift-serverless:Create*",
+             "redshift-serverless:Update*", "redshift-serverless:Delete*",
+             "redshift-serverless:Restore*", "redshift-serverless:TagResource",
+             "redshift-serverless:UntagResource"],
+  "Resource": "*",
+  "Condition": { "Bool": { "aws:ViaAWSMCPService": "true" } }
+}

@@ -1,0 +1,9 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    { "Sid": "AttachOnlyTheDenyPolicyToTheModelRole", "Effect": "Allow",
+      "Action": ["iam:AttachRolePolicy", "iam:DetachRolePolicy"],
+      "Resource": "arn:aws:iam::<account-id>:role/<model-role-name>",
+      "Condition": { "ArnEquals": { "iam:PolicyARN": "arn:aws:iam::<account-id>:policy/<deny-policy-name>" } } }
+  ]
+}
