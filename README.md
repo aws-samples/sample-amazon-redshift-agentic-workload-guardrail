@@ -2,6 +2,9 @@
 
 This repository holds the IAM policies, SQL, AWS CLI commands and Python files that accompany the AWS Big Data Blog post on guardrails and cost control for agentic workloads with Amazon Redshift. Each folder is self-contained: its README says when to use it, who runs it, and how to set it up, verify it and clean it up.
 
+> [!IMPORTANT]
+> This is sample code, for non-production usage. You should work with your security and legal teams to meet your organizational security, regulatory and compliance requirements before deployment.
+
 ## The layered guardrail model
 
 ![The layered guardrail model for agentic analytics on Amazon Redshift, read top to bottom in four numbered rows. 1, agentic patterns: conversational analytics through AI assistants with MCP servers or apps with Knowledge Bases, Enrich with Redshift ML, Act with scoped tools behind AgentCore Gateway, and Operate with Kiro and Redshift skills. 2, the agent layer, mostly probabilistic, screens prompts and tickets, guides reasoning, and checks the answer. 3, the access layer, deterministic, keeps SQL tools read-only, blocks infrastructure changes, and scopes writes. 4, the data layer, prompt-independent, applies per-agent identity, row, column, and masking policies, output limits, and compute limits. Below, the cost envelope adds model tokens, query compute, and data at rest, with no new meter.](images/fig1-layered-model.png)
