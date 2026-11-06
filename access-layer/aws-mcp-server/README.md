@@ -41,13 +41,18 @@ Least privilege needs both scopes: the IAM policy limits which workgroup and whi
 | Access layer | Workgroup tag `agent-access=true`, set by an administrator outside any agent | Redshift Serverless | Step 2b |
 | Access layer | The role's own downstream permissions, with no AWS MCP Server specific actions | IAM | [`agent-data-plane-policy.json`](../shared/agent-data-plane-policy.json) |
 | Access layer | Sign-in only with `redshift-serverless:GetCredentials` (or `redshift:GetClusterCredentialsWithIAM` on a provisioned cluster), never `redshift:GetClusterCredentials` or a Secrets Manager secret, which let a caller pick another database user | IAM | `RunSqlOnOneWorkgroup` in `agent-data-plane-policy.json` |
+| Access layer | Optional: keep the agent role on this path. Deny Data API calls that don't come through AWS managed MCP servers, and direct driver sign-in, so the agent's shell can't go around the server | IAM, on agent roles or permission sets only | [`deny-data-api-outside-aws-mcp.json`](deny-data-api-outside-aws-mcp.json) (step 2c) |
 | Data layer | Grants on one database role, row-level security, column privileges, masking | Redshift | [`agent-role.sql`](../../data-layer/agent-role.sql), [`fine-grained-access.sql`](../../data-layer/fine-grained-access.sql) |
 | Cost envelope | `statement_timeout` and `CONNECTION LIMIT` on the agent's database user | Redshift | Step 6 |
 | Cost envelope | Workgroup max capacity and daily usage limit | Redshift Serverless | `cost-envelope/serverless-ceilings.sh` (see Related) |
 
 ## Files
 
-This folder has no files; set up uses the linked files below: the four files in [`../shared/`](../shared/) and [`../../data-layer/agent-role.sql`](../../data-layer/agent-role.sql), [`../../data-layer/redshiftdbroles-tag.sh`](../../data-layer/redshiftdbroles-tag.sh) (quoted lines only) and [`../../data-layer/fine-grained-access.sql`](../../data-layer/fine-grained-access.sql).
+| File | What it is | Where you use it | Identity |
+| --- | --- | --- | --- |
+| [`deny-data-api-outside-aws-mcp.json`](deny-data-api-outside-aws-mcp.json) | IAM policy with two deny statements. `DataApiOnlyThroughAwsMcp` denies every `redshift-data:` action unless the request comes through an AWS managed MCP server (`aws:ViaAWSMCPService`). `NoDirectDriverSignIn` denies `GetCredentials`, `GetClusterCredentialsWithIAM`, `GetClusterCredentials` and both `GetIdentityCenterAuthToken` actions when `aws:ViaAWSService` is false | Optional inline policy `agent-mcp-only` (step 2c) | attached to the agent role or the agent's permission set, never as an SCP |
+
+Set up also uses the linked files below: the four files in [`../shared/`](../shared/) and [`../../data-layer/agent-role.sql`](../../data-layer/agent-role.sql), [`../../data-layer/redshiftdbroles-tag.sh`](../../data-layer/redshiftdbroles-tag.sh) (quoted lines only) and [`../../data-layer/fine-grained-access.sql`](../../data-layer/fine-grained-access.sql).
 
 ## Prerequisites
 
@@ -68,6 +73,7 @@ Placeholders in this path:
 - `<workgroup-arn>`: the agent workgroup's ARN, for the tag.
 - `<untagged-workgroup>`: a workgroup without the tag, for Verify.
 - `<policy-id>` and `<sandbox-ou-id>`: the SCP's ID and the sandbox OU.
+- `<agent-role>`: the agent role to keep on this path in step 2c, `agent-redshift-readonly` in this README.
 - `<id>`: the statement ID that `execute-statement` returns.
 - `111122223333` and `us-east-1`: the example account ID and Region. Replace them with yours, including inside the `shared` files.
 
@@ -151,7 +157,7 @@ aws iam get-role-policy --role-name agent-redshift-readonly --policy-name agent-
 ```
 
 What this does:
-- Denies, on requests through AWS managed MCP servers, Data API SQL on workgroups without `agent-access=true` and Redshift and Redshift Serverless infrastructure changes, including tag changes. Direct CLI calls with the same profile aren't affected; the role's own policy bounds them.
+- Denies, on requests through AWS managed MCP servers, Data API SQL on workgroups without `agent-access=true` and Redshift and Redshift Serverless infrastructure changes, including tag changes. Direct CLI calls with the same profile aren't affected; the role's own policy bounds them, and the optional step 2c denies them.
 - The [shared controls README](../shared/) has the same steps with their verify and cleanup.
 
 ### 2b. Tag the agent workgroup
@@ -166,6 +172,39 @@ aws redshift-serverless list-tags-for-resource --resource-arn <workgroup-arn>
 
 What this does:
 - Adds `agent-access=true` to the workgroup; `list-tags-for-resource` shows it. The key and the value are case-sensitive.
+
+### 2c. Keep the agent role on this path
+
+Optional. Agents with shell access can call the Data API with the AWS CLI and go around the server. Attach [`deny-data-api-outside-aws-mcp.json`](deny-data-api-outside-aws-mcp.json) to the agent role, as an IAM administrator:
+
+```bash
+cd access-layer/aws-mcp-server
+aws iam put-role-policy --role-name <agent-role> --policy-name agent-mcp-only \
+  --policy-document file://deny-data-api-outside-aws-mcp.json
+aws iam get-role-policy --role-name <agent-role> --policy-name agent-mcp-only
+```
+
+What this does:
+- Denies every `redshift-data:` call the role makes unless it comes through an AWS managed MCP server. `BoolIfExists` also denies calls that carry no `aws:ViaAWSMCPService` key, such as direct AWS CLI and SDK calls.
+- Denies direct driver sign-in (`redshift-serverless:GetCredentials`, `redshift:GetClusterCredentialsWithIAM`, `redshift:GetClusterCredentials`, and the `GetIdentityCenterAuthToken` actions used with trusted identity propagation) when `aws:ViaAWSService` is false. The Data API's own sign-in still works, because the Data API makes it as an AWS service. A sign-in call that a script on the AWS MCP Server makes itself is denied too, so the agent can't get database credentials through the server and connect with a driver from its shell.
+
+Notes:
+- The first database sign-in can go through the assistant, so you can attach this policy before the first sign-in. With it attached, the direct `redshift-data` commands in step 3 and in step 4b, variant B, are denied: create the database user by asking the assistant to run `SELECT current_user` (steps 7 and 8), then run steps 4 to 6.
+- For IAM Identity Center permission sets, add the statements to the permission set's inline policy, not to the `AWSReservedSSO_*` role, which IAM Identity Center owns and reprovisions. A permission set has one inline policy, so merge the two statements into it.
+- Attach it to agent principals only, never as an organization-wide SCP. An SCP would also deny applications, JDBC, ODBC and Python drivers, Query Editor v2 and SageMaker Unified Studio querybook cell runs, which don't come through an AWS managed MCP server.
+- Don't attach it to a role that the Redshift MCP Server path also uses: IAM can't tell the local server from the AWS CLI, so it denies the server too. Give each server its own role, as in [Which identity Redshift sees](#which-identity-redshift-sees).
+
+Where to attach the deny for each credential type:
+
+| Credential type | Attach the deny to | Notes |
+| --- | --- | --- |
+| IAM role (`AssumeRole`, including roles that agents or CI assume) | The role's inline or managed policy | The command above |
+| IAM user with access keys | The user's inline or managed policy, or a group policy | |
+| Federated user (`GetFederationToken`) | The parent IAM user's policies | A session policy can only restrict, so it can't remove the deny. Sessions issued before you attach it are denied too |
+| OIDC or SAML role (`AssumeRoleWithWebIdentity`, `AssumeRoleWithSAML`) | The role's permissions policy | The trust policy decides who gets the role; the permissions policy carries the deny |
+| IAM Identity Center permission set (`AWSReservedSSO_*` role) | The permission set's inline policy, or a customer managed policy that the permission set references | Never edit the `AWSReservedSSO_*` role directly |
+| Role used with trusted identity propagation (identity-enhanced session) | The role's policy | The identity context doesn't change how IAM evaluates the deny |
+| Any of the above, as a limit the agent's owner can't remove | A permissions boundary on the role or user | A boundary sets the maximum permissions, so it also needs an allow statement for the actions the role uses; the identity policy still grants them |
 
 ### 3. Create the database user
 
@@ -283,7 +322,10 @@ Restart the MCP client and ask the assistant to run `SELECT current_user` on `<a
 | `SELECT current_user` on the tagged agent workgroup, through the assistant | agent role, through the MCP Proxy for AWS | statement `FINISHED`, result `IAMR:agent-redshift-readonly` |
 | `SELECT current_user` on `<untagged-workgroup>`, through the assistant | agent role, through the MCP Proxy for AWS | `AccessDeniedException ... with an explicit deny in a service control policy` (SCP form) or `... with an explicit deny in an identity-based policy` (identity policy form) |
 | Ask the assistant to tag a workgroup | agent role, through the MCP Proxy for AWS | explicit deny on `redshift-serverless:TagResource` |
-| The same SQL run directly with `aws redshift-data execute-statement --profile redshift-agent` | agent role, direct CLI call | bounded by the role's own policy only: it works on the workgroup in `RunSqlOnOneWorkgroup` and gets AccessDenied elsewhere; the deny statements match only requests through AWS managed MCP servers |
+| The same SQL run directly with `aws redshift-data execute-statement --profile redshift-agent` | agent role, direct CLI call | without step 2c, bounded by the role's own policy only: it works on the workgroup in `RunSqlOnOneWorkgroup` and gets AccessDenied elsewhere; the deny statements match only requests through AWS managed MCP servers |
+| With step 2c: the same SQL run directly with `aws redshift-data execute-statement --profile redshift-agent` | agent role, direct CLI call | denied, with a message that ends `with an explicit deny in an identity-based policy` |
+| With step 2c: `aws redshift-serverless get-credentials --workgroup-name <agent-workgroup> --profile redshift-agent --region us-east-1` | agent role, direct CLI call | denied, with a message that ends `with an explicit deny in an identity-based policy`. The error code differs by API (`AccessDeniedException` from the Data API and Redshift Serverless, `AccessDenied` from the Redshift API on provisioned clusters), so check the message |
+| With step 2c: `SELECT current_user` on the agent workgroup, through the assistant (`aws___run_script`) | agent role, through the MCP Proxy for AWS | statement `FINISHED`, result `IAMR:agent-redshift-readonly` |
 | `SELECT usename, useconnlimit FROM pg_user_info WHERE usename = 'IAMR:agent-redshift-readonly';` | database administrator | `useconnlimit` is `10` |
 
 ## Common errors
@@ -298,6 +340,8 @@ Restart the MCP client and ask the assistant to run `SELECT current_user` on `<a
 | `permission denied for schema sales` after tagging in step 4b, variant B | `agent_support` doesn't exist because step 4a was skipped, or the agent hasn't signed in again since the tag change | Run step 4a, then sign in again |
 | `AccessDenied` calling `AssumeRole` with the `redshift-agent` profile | The trust policy's principal isn't your developer role's full ARN. For IAM Identity Center roles that ARN includes the `aws-reserved/sso.amazonaws.com/` path, followed by the Region of your IAM Identity Center instance unless it's `us-east-1`, as in `arn:aws:iam::111122223333:role/aws-reserved/sso.amazonaws.com/eu-west-2/AWSReservedSSO_<permission-set>_<suffix>` | `aws sts get-caller-identity --profile developer` shows the role name in its assumed-role session ARN, which has no path. `aws iam list-roles --path-prefix /aws-reserved/sso.amazonaws.com/ --query "Roles[].Arn"` shows the full role ARN to put in the trust policy |
 | Every AWS CLI command fails with `Unable to parse config file` | `~/.aws/config` has two `[profile redshift-agent]` blocks, because the profile was appended twice | Delete one of the two blocks |
+| The local Redshift MCP Server gets `AccessDeniedException ... with an explicit deny in an identity-based policy` | Expected: `deny-data-api-outside-aws-mcp.json` (step 2c) is attached to the role the local server signs with. IAM can't tell the local server from the AWS CLI | Don't attach the file on the Redshift MCP Server path: give that server its own role, or delete `agent-mcp-only` from the shared role |
+| `execute-statement` in step 3 is denied with an explicit deny | Step 2c is attached, which denies direct Data API calls | Create the database user through the assistant instead (steps 7 and 8) |
 
 ## Clean up
 
@@ -316,12 +360,13 @@ Restart the MCP client and ask the assistant to run `SELECT current_user` on `<a
    DROP USER "IAMR:agent-redshift-readonly";
    ```
 
-5. Delete the IAM role. Its inline policies may be `agent-data-plane`, plus `agent-denies` for the identity policy form, plus `redshiftdbroles-tag-read` if you used the tag; `delete-role` fails with `DeleteConflict` while any remains.
+5. Delete the IAM role. Its inline policies may be `agent-data-plane`, plus `agent-denies` for the identity policy form, plus `agent-mcp-only` if you ran step 2c, plus `redshiftdbroles-tag-read` if you used the tag; `delete-role` fails with `DeleteConflict` while any remains. To keep the role and only remove step 2c, run the `agent-mcp-only` line alone.
 
    ```bash
    aws iam list-role-policies --role-name agent-redshift-readonly
    aws iam delete-role-policy --role-name agent-redshift-readonly --policy-name agent-data-plane
    aws iam delete-role-policy --role-name agent-redshift-readonly --policy-name agent-denies
+   aws iam delete-role-policy --role-name <agent-role> --policy-name agent-mcp-only
    aws iam delete-role-policy --role-name agent-redshift-readonly --policy-name redshiftdbroles-tag-read
    aws iam list-attached-role-policies --role-name agent-redshift-readonly
    aws iam delete-role --role-name agent-redshift-readonly

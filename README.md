@@ -125,7 +125,7 @@ Replace every placeholder in angle brackets, and every example name you don't wa
 | [`access-layer/`](access-layer/README.md) | One folder per access path, and the shared controls | IAM and database administrators, developers |
 | [`access-layer/shared/`](access-layer/shared/README.md) | The data plane policy, two deny statements and the agent profile used by more than one path | IAM and AWS Organizations administrators |
 | [`access-layer/redshift-mcp-server/`](access-layer/redshift-mcp-server/README.md) | Setup for an AI assistant with the Amazon Redshift MCP Server | Developers, platform team |
-| [`access-layer/aws-mcp-server/`](access-layer/aws-mcp-server/README.md) | Setup for an AI assistant with the AWS MCP Server and the MCP Proxy for AWS | Developers, platform team |
+| [`access-layer/aws-mcp-server/`](access-layer/aws-mcp-server/README.md) | Setup for an AI assistant with the AWS MCP Server and the MCP Proxy for AWS, and an optional deny policy that keeps the agent role on that path | Developers, platform team |
 | [`access-layer/custom-mcp-server/`](access-layer/custom-mcp-server/README.md) | A sample MCP server with one fixed, parameterized tool | Application developers |
 | [`access-layer/agentcore-custom-agent/`](access-layer/agentcore-custom-agent/README.md) | Identity, policy and limits for a custom agent on Amazon Bedrock AgentCore | Agent developers |
 | [`access-layer/bedrock-knowledge-base/`](access-layer/bedrock-knowledge-base/README.md) | The Redshift configuration and service role policy for Amazon Bedrock Knowledge Bases | Application developers |

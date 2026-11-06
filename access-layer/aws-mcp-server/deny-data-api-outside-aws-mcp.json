@@ -1,0 +1,15 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    { "Sid": "DataApiOnlyThroughAwsMcp", "Effect": "Deny",
+      "Action": "redshift-data:*",
+      "Resource": "*",
+      "Condition": { "BoolIfExists": { "aws:ViaAWSMCPService": "false" } } },
+    { "Sid": "NoDirectDriverSignIn", "Effect": "Deny",
+      "Action": ["redshift-serverless:GetCredentials", "redshift-serverless:GetIdentityCenterAuthToken",
+                 "redshift:GetClusterCredentialsWithIAM", "redshift:GetClusterCredentials",
+                 "redshift:GetIdentityCenterAuthToken"],
+      "Resource": "*",
+      "Condition": { "Bool": { "aws:ViaAWSService": "false" } } }
+  ]
+}
