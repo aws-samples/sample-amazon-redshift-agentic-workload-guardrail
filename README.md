@@ -175,6 +175,11 @@ Clean up in this order. Each README has the commands for what it created.
 
 Each step removes objects that depend on what a later step removes: `agent_support` is dropped only after no path user holds it, and the shared denies come off last, so agents stay bounded until they're gone.
 
+## Authors
+
+- Jason Pedreza ([@jasonpedreza](https://github.com/jasonpedreza))
+- Dan Jin ([@danjin](https://github.com/danjin))
+
 ## Security
 
 See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information. Review every policy with IAM Access Analyzer (`aws accessanalyzer validate-policy`) before you attach it.
